@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Extendable Splatoonz Mini Battle - Upgraded</title>
+<style>
+  body {
+    background: #111;
+    margin: 0;
+    overflow: hidden;
+    user-select: none;
+    font-family: monospace, monospace;
+    color: #0ff;
+  }
+  canvas {
+    display: block;
+    margin: auto;
+    background: #222;
+    border: 3px solid #0ff;
+    border-radius: 8px;
+    cursor: crosshair;
+  }
+  #ui {
+    position: fixed;
+    top: 10px; left: 10px;
+    z-index: 10;
+  }
+  #menu {
+    position: fixed;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    background: #000c;
+    border: 2px solid #0ff;
+    padding: 20px 30px;
+    border-radius: 10px;
+    text-align: center;
+    max-width: 350px;
+  }
+  #menu h2 {
+    margin-top: 0;
+  }
+  #menu button, #menu select {
+    background: #0ff;
+    border: none;
+    padding: 10px 20px;
+    font-size: 16px;
+    margin-top: 15px;
+    cursor: pointer;
+    border-radius: 6px;
+    color: #000;
+    font-weight: bold;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  #menu label {
+    color: #0ff;
+    font-weight: bold;
+    display: block;
+    margin-top: 10px;
+  }
+</style>
+</head>
+<body>
+
+<div id="ui" style="display:none;">
+  <div>Health: <span id="health">100</span></div>
+  <div>Weapon: <span id="weaponName"></span></div>
+  <div>Map: <span id="currentMap">Default</span></div>
+</div>
+
+<div id="menu">
+  <h2>Choose Your Weapon & Map</h2>
+  <label for="weaponSelect">Weapon</label>
+  <select id="weaponSelect"></select>
+
+  <label for="mapSelect">Map</label>
+  <select id="mapSelect"></select>
+
+  <button id="startBtn">Start Battle</button>
+</div>
+
+<canvas id="game" width="900" height="600"></canvas>
+
+<script>
+(() => {
+  // ----- CONFIG & MODULAR DATA -----
+  // Weapons with new entries: Dualies, Chargers, Shooters
+  const weapons = {
+    splatana: {
+      name: "Splatana",
+      color: "#6cf",
+      damage: 30,
+      fireRate: 1000,
+      projectileSpeed: 12,
+      size: 10,
+      spread: 0,
+      burst: 1,
+      burstDelay: 0,
+      description: "Heavy hitter, slow fire rate",
+      reloadSound: 600,
+    },
+    aerospray: {
+      name: "Aerospray",
+      color: "#0ff",
+      damage: 10,
+      fireRate: 200,
+      projectileSpeed: 15,
+      size: 6,
+      spread: 0.3,
+      burst: 3,
+      burstDelay: 80,
+      description: "Rapid fire, low damage",
+      reloadSound: 800,
+    },
+    nZap: {
+      name: "N-Zap",
+      color: "#ff0",
+      damage: 15,
+      fireRate: 400,
+      projectileSpeed: 18,
+      size: 6,
+      spread: 0.1,
+      burst: 2,
+      burstDelay: 150,
+      description: "Burst fire, moderate damage",
+      reloadSound: 750,
+    },
+    dualies: {
+      name: "Dualies",
+      color: "#f0f",
+      damage: 12,
+      fireRate: 300,
+      projectileSpeed: 17,
+      size: 5,
+      spread: 0.25,
+      burst: 2,
+      burstDelay: 100,
+      description: "Quick dual shot with dodge ability",
+      reloadSound: 900,
+    },
+    charger: {
+      name: "Charger",
+      color: "#09f",
+      damage: 50,
+      fireRate: 1500,
+      projectileSpeed: 25,
+      size: 8,
+      spread: 0,
+      burst: 1,
+      burstDelay: 0,
+      description: "Long range, powerful charge shot",
+      reloadSound: 500,
+    },
+    shooter: {
+      name: "Shooter",
+      color: "#fa0",
+      damage: 20,
+      fireRate: 500,
+      projectileSpeed: 20,
+      size: 7,
+      spread: 0.15,
+      burst: 1,
+      burstDelay: 0,
+      description: "Balanced shooter with moderate damage",
+      reloadSound: 650,
+    },
+  };
+
+  // Multiple maps with different obstacles
+  const maps = {
+    default: {
+      name: "Default",
+      obstacles: [
+        { x: 300, y: 150, w: 80, h: 200 },
+        { x: 600, y: 350, w: 150, h: 60 },
+        { x: 150, y: 450, w: 100, h: 80 },
+      ],
+      objective: { x: 400, y: 250, radius: 70 }
+    },
+    urban: {
+      name: "Urban",
+      obstacles: [
+        { x: 100, y: 100, w: 150, h: 50 },
+        { x: 500, y: 200, w: 100, h: 200 },
+        { x: 700, y: 100, w: 50, h: 300 },
+        { x: 350, y: 450, w: 300, h: 30 },
+      ],
+      objective: { x: 450, y: 350, radius: 60 }
+    },
+    splatPark: {
+      name: "Splat Park",
+      obstacles: [
+        { x: 200, y: 300, w: 80, h: 80 },
+        { x: 400, y: 150, w: 60, h: 60 },
+        { x: 600, y: 400, w: 120, h: 100 },
+      ],
+      objective: { x: 500, y: 300, radius: 80 }
+    },
+  };
+
+  // ----- UTILS -----
+  const clamp = (v, min, max) => Math.min(Math.max(v, min), max);
+  const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+  const angleBetween = (a, b) => Math.atan2(b.y - a.y, b.x - a.x);
+
+  // ----- SOUNDS -----
+  class Sound {
+    constructor(freq, duration=0.1, type='square', volume=0.2) {
+      this.freq = freq;
+      this.duration = duration;
+      this.type = type;
+      this.volume = volume;
+    }
+    play() {
+      if (!window.AudioContext && !window.webkitAudioContext) return;
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const oscillator = ctx.createOscillator();
+      const gainNode = ctx.createGain();
+      oscillator.type = this.type;
+      oscillator.frequency.value = this.freq;
+      gainNode.gain.setValueAtTime(this.volume, ctx.currentTime);
+      oscillator.connect(gainNode);
+      gainNode.connect(ctx.destination);
+      oscillator.start();
+      oscillator.stop(ctx.currentTime + this.duration);
+      oscillator.onended = () => ctx.close();
+    }
+  }
+  const sounds = {
+    shoot: new Sound(1000, 0.05, 'square', 0.1),
+    hit: new Sound(300, 0.1, 'triangle', 0.15),
+    death: new Sound(150, 0.3, 'sawtooth', 0.25),
+    reload: freq => new Sound(freq, 0.2, 'sine', 0.15),
+    explosion: new Sound(400, 0.4, 'triangle', 0.25),
+  };
+
+  // ----- INPUT HANDLING -----
+  const keys = {};
+  let mousePos = { x: 0, y: 0 };
+  let mouseDown = false;
+
+  window.addEventListener('keydown', e => { keys[e.key.toLowerCase()] = true; });
+  window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+
+  canvas.addEventListener('mousemove', e => {
+    const rect = canvas.getBoundingClientRect();
+    mousePos = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  });
+  canvas.addEventListener('mousedown', e => { mouseDown = true; });
+  canvas.addEventListener('mouseup', e => { mouseDown = false; });
+
+  // ----- ENTITIES -----
+  class Player {
+    constructor(id, x, y, color, isHuman = false) {
+      this.id = id;
+      this.pos = { x, y };
+      this.color = color;
+      this.radius = 20;
+      this.health = 100;
+      this.speed = 3;
+      this.isHuman = isHuman;
+      this.weapon = weapons.splatana;
+      this.aimAngle = 0;
+      this.lastShot = 0;
+      this.burstShotsLeft = 0;
+      this.burstTimer = 0;
+      this.alive = true;
+      this.team = color === "#0ff" ? "blue" : "red";
+      this.hitFlash = 0;
+      this.reloadCooldown = 0;
+    }
+
+    update(delta, game) {
+      if (!this.alive) return;
+
+      if (this.reloadCooldown > 0) this.reloadCooldown -= delta;
+
+      if (this.isHuman) {
+        let dx = 0, dy = 0;
+        if (keys['w']) dy -= 1;
+        if (keys['s']) dy += 1;
+        if (keys['a']) dx -= 1;
+        if (keys['d']) dx += 1;
+
+        const len = Math.hypot(dx, dy);
+        if (len > 0) {
+          dx /= len; dy /= len;
+          this.move(dx * this.speed, dy * this.speed, game);
+        }
+
+        this.aimAngle = angleBetween(this.pos, mousePos);
+
+        if (mouseDown) {
+          this.shoot(delta, game);
+        } else {
+          this.burstShotsLeft = 0;
+          this.burstTimer = 0;
+        }
+      } else {
+        // Simple AI: chase nearest enemy and shoot if close
+        const enemies = game.players.filter(p => p.team !== this.team && p.alive);
+        if (enemies.length === 0) return;
+        const target = enemies.reduce((a,b) => (distance(this.pos, a.pos) < distance(this.pos, b.pos) ? a : b));
+        const distToTarget = distance(this.pos, target.pos);
+        if (distToTarget > 150) {
+          const angle = angleBetween(this.pos, target.pos);
+          this.move(Math.cos(angle)*this.speed*0.9, Math.sin(angle)*this.speed*0.9, game);
+          this.aimAngle = angle;
+        } else {
+          this.aimAngle = angleBetween(this.pos, target.pos);
+          this.shoot(delta, game);
+        }
+      }
+      if (this.burstTimer > 0) this.burstTimer -= delta;
+
+      if (this.hitFlash > 0) this.hitFlash -= delta;
+
+      if(this.reloadCooldown <= 0 && this.justShot) {
+        this.justShot = false;
+        const reloadSound = sounds.reload(this.weapon.reloadSound);
+        reloadSound.play();
+      }
+    }
+
+    move(dx, dy, game) {
+      let newX = this.pos.x + dx;
+      let newY = this.pos.y + dy;
+
+      for (const obs of game.obstacles) {
+        if (circleRectCollision(newX, newY, this.radius, obs)) return;
+      }
+      newX = clamp(newX, this.radius, canvas.width - this.radius);
+      newY = clamp(newY, this.radius, canvas.height - this.radius);
+
+      this.pos.x = newX;
+      this.pos.y = newY;
+    }
+
+    shoot(delta, game) {
+      const now = Date.now();
+      if (now - this.lastShot < this.weapon.fireRate) return;
+      if (this.reloadCooldown > 0) return;
+
+      if (this.burstShotsLeft === 0) {
+        this.burstShotsLeft = this.weapon.burst || 1;
+        this.burstTimer = 0;
+      }
+
+      if (this.burstShotsLeft > 0 && this.burstTimer <= 0) {
+        const spread = (Math.random() - 0.5) * this.weapon.spread;
+        const angle = this.aimAngle + spread;
+        const proj = new Projectile(
+          this.pos.x + Math.cos(angle) * this.radius,
+          this.pos.y + Math.sin(angle) * this.radius,
+          angle,
+          this.weapon.projectileSpeed,
+          this.weapon.color,
+          this.weapon.damage,
+          this.team,
+          this.id
+        );
+        game.projectiles.push(proj);
+        sounds.shoot.play();
+
+        this.burstShotsLeft--;
+        this.burstTimer = this.weapon.burstDelay || 50;
+        this.lastShot = now;
+        this.justShot = true;
+        this.reloadCooldown = this.weapon.fireRate * 0.7; // partial reload delay
+      }
+    }
+
+    takeDamage(amount) {
+      if (!this.alive) return;
+      this.health -= amount;
+      this.hitFlash = 100;
+      sounds.hit.play();
+      if (this.health <= 0) {
+        this.health = 0;
+        this.alive = false;
+        sounds.death.play();
+      }
+    }
+
+    draw(ctx) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(this.pos.x, this.pos.y, this.radius, 0, Math.PI*2);
+
+      if (this.hitFlash > 0) {
+        const alpha = Math.sin((this.hitFlash / 100) * Math.PI * 10) * 0.6;
+        ctx.fillStyle = `rgba(255,255,255,${alpha.toFixed(2)})`;
+        ctx.fill();
+      }
+
+      ctx.fillStyle = this.color;
+      ctx.fill();
+
+      // Health bar
+      ctx.fillStyle = "#000";
+      ctx.fillRect(this.pos.x - this.radius, this.pos.y - this.radius - 14, this.radius*2, 6);
+      ctx.fillStyle = "#0f0";
+      ctx.fillRect(this.pos.x - this.radius, this.pos.y - this.radius - 14, this.radius*2 * (this.health/100), 6);
+
+      // Gun
+      const gunLength = this.radius + 10;
+      ctx.strokeStyle = "#fff";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(this.pos.x, this.pos.y);
+      ctx.lineTo(this.pos.x + Math.cos(this.aimAngle)*gunLength, this.pos.y + Math.sin(this.aimAngle)*gunLength);
+      ctx.stroke();
+
+      ctx.restore();
+    }
+  }
+
+  class Projectile {
+    constructor(x, y, angle, speed, color, damage, team, ownerId) {
+      this.pos = { x, y };
+      this.vel = { x: Math.cos(angle)*speed, y: Math.sin(angle)*speed };
+      this.color = color;
+      this.radius = 5;
+      this.damage = damage;
+      this.team = team;
+      this.ownerId = ownerId;
+      this.alive = true;
+      this.lifeTime = 2000;
+      this.age = 0;
+    }
+
+    update(game, delta) {
+      this.pos.x += this.vel.x;
+      this.pos.y += this.vel.y;
+      this.age += delta;
+
+      if (this.age > this.lifeTime ||
+          this.pos.x < 0 || this.pos.x > canvas.width ||
+          this.pos.y < 0 || this.pos.y > canvas.height) {
+        this.alive = false;
+        return;
+      }
+
+      for (const obs of game.obstacles) {
+        if (circleRectCollision(this.pos.x, this.pos.y, this.radius, obs)) {
+          this.alive = false;
+          sounds.explosion.play();
+          return;
+        }
+      }
+
+      for (const p of game.players) {
+        if (p.alive && p.team !== this.team && p.id !== this.ownerId) {
+          if (distance(this.pos, p.pos) < p.radius + this.radius) {
+            p.takeDamage(this.damage);
+            this.alive = false;
+            sounds.explosion.play();
+            return;
+          }
+        }
+      }
+    }
+
+    draw(ctx) {
+      ctx.fillStyle = this.color;
+      ctx.beginPath();
+      ctx.arc(this.pos.x, this.pos.y, this.radius, 0, Math.PI*2);
+      ctx.fill();
+    }
+  }
+
+  function circleRectCollision(cx, cy, cr, rect) {
+    const rx = rect.x;
+    const ry = rect.y;
+    const rw = rect.w;
+    const rh = rect.h;
+    const closestX = clamp(cx, rx, rx + rw);
+    const closestY = clamp(cy, ry, ry + rh);
+    const distX = cx - closestX;
+    const distY = cy - closestY;
+    return (distX*distX + distY*distY) < (cr*cr);
+  }
+
+  // ----- GAME STATE -----
+  let players = [];
+  let projectiles = [];
+  let currentMap = maps.default;
+
+  let humanPlayer = null;
+
+  // ----- UI ELEMENTS -----
+  const healthEl = document.getElementById('health');
+  const weaponNameEl = document.getElementById('weaponName');
+  const ui = document.getElementById('ui');
+  const menu = document.getElementById('menu');
+  const startBtn = document.getElementById('startBtn');
+  const weaponSelect = document.getElementById('weaponSelect');
+  const mapSelect = document.getElementById('mapSelect');
+  const currentMapEl = document.getElementById('currentMap');
+
+  // Populate weapon select with weapon names dynamically
+  Object.entries(weapons).forEach(([key, weapon]) => {
+    const opt = document.createElement('option');
+    opt.value = key;
+    opt.textContent = weapon.name + " - " + weapon.description;
+    weaponSelect.appendChild(opt);
+  });
+
+  // Populate map select
+  Object.entries(maps).forEach(([key, map]) => {
+    const opt = document.createElement('option');
+    opt.value = key;
+    opt.textContent = map.name;
+    mapSelect.appendChild(opt);
+  });
+
+  function startGame(selectedWeaponKey, selectedMapKey) {
+    players = [];
+    projectiles = [];
+
+    currentMap = maps[selectedMapKey] || maps.default;
+    currentMapEl.textContent = currentMap.name;
+
+    humanPlayer = new Player(0, 100, 100, "#0ff", true);
+    humanPlayer.weapon = weapons[selectedWeaponKey];
+    players.push(humanPlayer);
+
+    // AI teammates
+    for(let i=1; i<=2; i++) {
+      const ai = new Player(i, 150 + i*50, 200, "#08c");
+      const keys = Object.keys(weapons);
+      ai.weapon = weapons[keys[Math.floor(Math.random()*keys.length)]];
+      players.push(ai);
+    }
+
+    // AI enemies
+    for(let i=10; i<=14; i++) {
+      const enemy = new Player(i, 600 + (i-10)*40, 300 + ((i-10)%2)*80, "#f33");
+      const keys = Object.keys(weapons);
+      enemy.weapon = weapons[keys[Math.floor(Math.random()*keys.length)]];
+      players.push(enemy);
+    }
+
+    menu.style.display = 'none';
+    ui.style.display = 'block';
+    requestAnimationFrame(gameLoop);
+  }
+
+  let lastTime = 0;
+
+  function gameLoop(time=0) {
+    const delta = time - lastTime;
+    lastTime = time;
+
+    players.forEach(p => p.update(delta, { players, obstacles: currentMap.obstacles }));
+
+    for (let i = projectiles.length - 1; i >= 0; i--) {
+      projectiles[i].update({ players, obstacles: currentMap.obstacles }, delta);
+      if (!projectiles[i].alive) projectiles.splice(i, 1);
+    }
+
+    // Objective capture logic
+    let holders = players.filter(p => p.alive && distance(p.pos, currentMap.objective) < currentMap.objective.radius);
+    let blueCount = holders.filter(p => p.team === "blue").length;
+    let redCount = holders.filter(p => p.team === "red").length;
+
+    if (blueCount > redCount) {
+      if (currentMap.objective.holder !== "blue") {
+        currentMap.objective.captureTime = (currentMap.objective.captureTime || 0) + 1;
+        if (currentMap.objective.captureTime > 60) {
+          currentMap.objective.holder = "blue";
+          currentMap.objective.captureTime = 0;
+        }
+      } else {
+        currentMap.objective.captureTime = 0;
+      }
+    } else if (redCount > blueCount) {
+      if (currentMap.objective.holder !== "red") {
+        currentMap.objective.captureTime = (currentMap.objective.captureTime || 0) + 1;
+        if (currentMap.objective.captureTime > 60) {
+          currentMap.objective.holder = "red";
+          currentMap.objective.captureTime = 0;
+        }
+      } else {
+        currentMap.objective.captureTime = 0;
+      }
+    } else {
+      currentMap.objective.captureTime = 0;
+    }
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Draw objective
+    ctx.beginPath();
+    ctx.arc(currentMap.objective.x, currentMap.objective.y, currentMap.objective.radius, 0, Math.PI*2);
+    ctx.fillStyle = currentMap.objective.holder === "blue" ? "rgba(0,200,255,0.3)" :
+                      currentMap.objective.holder === "red" ? "rgba(255,50,50,0.3)" :
+                      "rgba(255,255,255,0.1)";
+    ctx.fill();
+    ctx.strokeStyle = "#0ff";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Draw obstacles
+    ctx.fillStyle = "#444";
+    currentMap.obstacles.forEach(o => {
+      ctx.fillRect(o.x, o.y, o.w, o.h);
+      ctx.strokeStyle = "#0ff";
+      ctx.strokeRect(o.x, o.y, o.w, o.h);
+    });
+
+    // Draw players & projectiles
+    players.forEach(p => p.draw(ctx));
+    projectiles.forEach(proj => proj.draw(ctx));
+
+    // Update UI
+    if(humanPlayer) {
+      healthEl.textContent = humanPlayer.health.toFixed(0);
+      weaponNameEl.textContent = humanPlayer.weapon.name;
+    }
+
+    requestAnimationFrame(gameLoop);
+  }
+
+  startBtn.onclick = () => {
+    const selectedWeapon = weaponSelect.value;
+    const selectedMap = mapSelect.value;
+    startGame(selectedWeapon, selectedMap);
+  };
+})();
+</script>
+
+</body>
+</html>
