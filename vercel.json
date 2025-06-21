@@ -1,3 +1,10 @@
 {
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+  "rewrites": [
+    { "source": "/api/create-room", "destination": "/api-create-room.js" },
+    { "source": "/api/join-room", "destination": "/api-join-room.js" },
+    { "source": "/api/start-ai-battle", "destination": "/api-start-ai-battle.js" },
+    { "source": "/api/weapons", "destination": "/api-weapons.js" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
 }
+
