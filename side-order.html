@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Side Order - Splatoonz</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>🎲 Side Order</h1>
+    <nav>
+      <a href="index.html">Home</a>
+      <a href="splatoonz.html">Back</a>
+    </nav>
+  </header>
+
+  <main>
+    <h2>Enter the Spire of Order</h2>
+    <p>Customize your palette and climb!</p>
+
+    <label for="paletteSelect">Choose Your Buff Palette:</label>
+    <select id="paletteSelect">
+      <option value="Attack">🟥 Attack Up</option>
+      <option value="Speed">🟦 Speed Boost</option>
+      <option value="Ink">🟨 Ink Saver</option>
+      <option value="Health">🟩 Damage Resistance</option>
+    </select>
+
+    <button onclick="startSideOrder()">Start Floor 1</button>
+
+    <div id="floor"></div>
+  </main>
+
+  <script>
+    let floorNum = 1;
+
+    function startSideOrder() {
+      const palette = document.getElementById('paletteSelect').value;
+
+      const enemies = ["Drone Bot", "Octotrooper", "Sniper AI", "Bomb Launcher"];
+      const wave = Array(3).fill().map(() =>
+        enemies[Math.floor(Math.random() * enemies.length)]
+      );
+
+      document.getElementById('floor').innerHTML = `
+        <h3>Floor ${floorNum}</h3>
+        <p>Palette: ${palette}</p>
+        <p>Enemies: ${wave.join(", ")}</p>
+        <p><i>Coming soon: actual battle system + palette upgrades</i></p>
+      `;
+
+      floorNum++;
+    }
+  </script>
+</body>
+</html>
