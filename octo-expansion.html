@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Octo Expansion - Splatoonz</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>🧠 Octo Expansion</h1>
+    <nav>
+      <a href="index.html">Home</a>
+      <a href="splatoonz.html">Back</a>
+    </nav>
+  </header>
+
+  <main>
+    <h2>Select a Mission</h2>
+    <ul id="missionList">
+      <li><button onclick="loadMission('B08')">B08: Grind It Out</button></li>
+      <li><button onclick="loadMission('C11')">C11: Ink & Dodge</button></li>
+      <li><button onclick="loadMission('D20')">D20: 360 No Splat</button></li>
+    </ul>
+
+    <div id="missionDetails"></div>
+  </main>
+
+  <script>
+    function loadMission(id) {
+      const info = {
+        B08: "Grind rails while splatting targets. Fail = restart.",
+        C11: "Ink all walls to escape in under 60 seconds.",
+        D20: "Jump and splat incoming Octoballs midair. Difficulty: HARD."
+      };
+
+      document.getElementById('missionDetails').innerHTML = `
+        <h3>Mission ${id}</h3>
+        <p>${info[id]}</p>
+        <p><i>Coming soon as a playable level.</i></p>
+      `;
+    }
+  </script>
+</body>
+</html>
