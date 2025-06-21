@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>AI Battle - Splatoonz</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>🤖 AI Battle - Splatoonz</h1>
+  </header>
+
+  <main>
+    <h2>Choose Your Loadout</h2>
+
+    <label for="modeSelect">Game Mode:</label>
+    <select id="modeSelect">
+      <option value="Turf War">Turf War</option>
+      <option value="Tower Control">Tower Control</option>
+      <option value="Rainmaker">Rainmaker</option>
+      <option value="Splat Zones">Splat Zones</option>
+      <option value="Random">Randomized</option>
+    </select>
+
+    <label for="weaponSelect">Weapon:</label>
+    <select id="weaponSelect">
+      <option disabled selected>Loading weapons...</option>
+    </select>
+
+    <br><br>
+    <button onclick="startAIBattle()">Start Battle</button>
+
+    <div id="result"></div>
+  </main>
+
+  <script>
+    async function loadWeapons() {
+      const res = await fetch('/api/weapons');
+      const data = await res.json();
+      const select = document.getElementById('weaponSelect');
+
+      select.innerHTML = ''; // Clear loading option
+      data.forEach(weapon => {
+        const opt = document.createElement('option');
+        opt.value = weapon.name;
+        opt.textContent = `${weapon.name} (Sub: ${weapon.sub}, Special: ${weapon.special})`;
+        select.appendChild(opt);
+      });
+    }
+
+    async function startAIBattle() {
+      const mode = document.getElementById('modeSelect').value;
+      const weapon = document.getElementById('weaponSelect').value;
+
+      const res = await fetch('/api/start-ai-battle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode, weapon })
+      });
+
+      const data = await res.json();
+      const result = document.getElementById('result');
+      result.innerHTML = `
+        <h3>Battle Started!</h3>
+        <p><strong>Mode:</strong> ${data.mode}</p>
+        <p><strong>Weapon:</strong> ${data.weapon}</p>
+        <p><strong>Enemies:</strong> ${data.enemies.join(', ')}</p>
+      `;
+    }
+
+    loadWeapons();
+  </script>
+</body>
+</html>
